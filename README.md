@@ -37,62 +37,74 @@ There's an experimental patch for windows in this [PR](https://github.com/udacit
 
 Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
 
-## Editor Settings
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+## Project Rubric 
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+### Describe the effect each of the P, I, D components had in your implementation.
 
-## Code Style
+For this project I implemented both a lateral and longitudinal controller to control the steering angle and throttle respectively.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+#### Lateral Control
 
-## Project Instructions and Rubric
+* P - Minimized the cross-track error. However, too large of a gain would cause large oscillations of the vehicle around the setpoint.
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+* I - Minimized the error-over-time of the CTE. This gain allows the vehicle to achieve a CTE of zero which P control alone cannot do. If incorrectly parameterized, could cause very large over-corrections when the vehicle is offset from the CTE for an extended period of time (like during a turning maneuver). 
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/e8235395-22dd-4b87-88e0-d108c5e5bbf4/concepts/6a4d8d42-6a04-4aa6-b284-1697c0fd6562)
-for instructions and the project rubric.
+* D - Minimized the rate-change of the CTE. Basically a "first responder" to a large steering requirement, this gain ensured that the vehicle turned in time during a curve. If too large, this parameter would cause the vehicle to over-steer. This parameter is very sensitive to the types of turns experienced on the track. It's likely that if tighter turns existed that this parameter would need further tuning.
 
-## Hints!
+#### Longitudinal Control
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+* P - Minimize the difference between the vehicle speed and the set speed. If too large of a parameter was used this would cause large oscillations in the vehicle speed.
 
-## Call for IDE Profiles Pull Requests
+* I - Minimize the error-over-time of the set-speed delta. This helps ensure that the set-speed is eventually reached over time.
 
-Help your fellow students!
+* D - Minimize the rate-change of speed to keep the acceleration smooth and reduce jerk.
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
+### Describe how the final hyperparameters were chosen.
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+The final parameters used for this project were:
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+#### Lateral
+* P = 0.190967
+* I = 0.000159967
+* D = 2.1
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+#### Longitudinal
+* P = 0.1
+* I = 0.00001
+* D = 0.1
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+#### Tuning
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+I began by tuning the parameters by hand, then once I'd found parameters that seemed to be close, I used Twiddle to fine tune the results. For the lateral control:
+* I started with only proportional control and gradually increased the gain until the vehicle oscillated.
+* Cut the proportional control in half
+* Added a very small integral gain to allow the vehicle to reach the setpoint.
+* Added derivative gain until desirable behavior was observed.
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+I followed a similar pattern for the longitudinal control:
+* Proportional control until the speed oscillated
+* Cut the P gain in half
+* Added a small I gain
+* Added D gain until the speed controller was steady
 
+After manual tuning, the values I obtained were:
+
+#### Lateral
+* P = 0.-75
+* I = 0.0001
+* D = 3.0
+
+#### Longitudinal
+* P = 0.1
+* I = 0.00001
+* D = 0.1
+
+At this point I decided to implement the twiddle algorithm on both controllers. However I found that tuning the longitudinal controller was not really improving the performance significantly and was doubling the time it took to tune so I disabled it. Using the manually tuned gains as a starting point, I ran the simulation over the whole course and obtained the following after 460 iterations:
+
+* STEERING Kp: 0.190967 Ki: 0.000159967 Kd: 2.1
+* STEERING Iteration: 460 Active Gain: 0 Gain State: 0
+* STEERING cycle: 1901 Current Error: 612.552
+
+### Conclusion
+In the end I was able to run the vehicle at a throttle target of 0.6, which comes out to around 50 mph. I included a steering angle saturation of +/- 20 degrees since that tended to oversteer the vehicle. If I were to add further improvements, I would add a controller which adjusted the throttle by using CTE as the error signal. I think this would help the vehicle slow down in curves. Additionally I would reexamine my proportional tuning since the vehicle wanders quite a bit on the track.

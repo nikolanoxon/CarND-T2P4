@@ -36,19 +36,15 @@ int main()
   PID pid_lat;
   PID pid_long;
 
-  pid_lat.Init(0.075, 0.0001, 3);
+  pid_lat.Init(0.190967, 0.000159967, 2.1);
   pid_long.Init(0.1, 0.00001, .1);
-  /*
-STEERING Kp: 0.190967 Ki: 0.000159967 Kd: 2.1
-STEERING Iteration: 460 Active Gain: 0 Gain State: 0
-STEERING cycle: 1901 Current Error: 612.552*/
 
   //  Enable or Disable Twiddle
-  bool so_you_want_to_twiddle = true;
+  bool so_you_want_to_twiddle = false;
 
   if (so_you_want_to_twiddle) {
     pid_lat.twiddle_state = 1;  //  active
-    pid_long.twiddle_state = 1; //  off
+    pid_long.twiddle_state = 0; //  off
   }
   else {
     pid_lat.twiddle_state = 0;  //  off
@@ -83,7 +79,7 @@ STEERING cycle: 1901 Current Error: 612.552*/
           pid_lat.UpdateError(cte);         //  Error of steering input is dependent on steering angle sign
           pid_long.UpdateError(fabs(cte));  //  Error of throttle input is independent of steering angle sign
 
-          // DEBUG
+          // Debug Messages for Twiddle
           if (pid_lat.cycle % 100 == 1) {
             std::cout << "STEERING Kp: " << pid_lat.Kp << " Ki: " << pid_lat.Ki << " Kd: " << pid_lat.Kd << std::endl;
             std::cout << "STEERING Iteration: " << pid_lat.twiddle_iteration << " Active Gain: " << pid_lat.current_gain << " Gain State: " << pid_lat.gain_state[pid_lat.current_gain] << std::endl;
@@ -131,9 +127,6 @@ STEERING cycle: 1901 Current Error: 612.552*/
           
           // Longitudinal PID
           double throttle_value = throttle_target - (pid_long.Kp * pid_long.p_error + pid_long.Ki * pid_long.i_error + pid_long.Kd * pid_long.d_error);
-
-          // DEBUG
-//          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
