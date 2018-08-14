@@ -65,7 +65,7 @@ For this project I implemented both a lateral and longitudinal controller to con
 The final parameters used for this project were:
 
 #### Lateral
-* P = 0.190967
+* P = 0.090967
 * I = 0.000159967
 * D = 2.1
 
@@ -102,9 +102,9 @@ After manual tuning, the values I obtained were:
 
 At this point I decided to implement the twiddle algorithm on both controllers. However I found that tuning the longitudinal controller was not really improving the performance significantly and was doubling the time it took to tune so I disabled it. Using the manually tuned gains as a starting point, I ran the simulation over the whole course and obtained the following after 460 iterations:
 
-* STEERING Kp: 0.190967 Ki: 0.000159967 Kd: 2.1
+* STEERING Kp: 0.090967 Ki: 0.000159967 Kd: 2.1
 * STEERING Iteration: 460 Active Gain: 0 Gain State: 0
 * STEERING cycle: 1901 Current Error: 612.552
 
 ### Conclusion
-In the end I was able to run the vehicle at a throttle target of 0.6, which comes out to around 50 mph. I included a steering angle saturation of +/- 20 degrees since that tended to oversteer the vehicle. If I were to add further improvements, I would add a controller which adjusted the throttle by using CTE as the error signal. I think this would help the vehicle slow down in curves. Additionally I would reexamine my proportional tuning since the vehicle wanders quite a bit on the track.
+In the end I was able to run the vehicle at a throttle target of 0.6, which comes out to around 50 mph. I included a steering angle saturation of +/- 20 degrees since that tended to oversteer the vehicle. If I were to add further improvements, I would add a controller which adjusted the throttle by using CTE as the error signal. I think this would help the vehicle slow down in curves. Additionally I would reexamine my proportional tuning since the vehicle wanders quite a bit on the track.nik

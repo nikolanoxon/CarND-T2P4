@@ -32,14 +32,27 @@ int main()
 {
   uWS::Hub h;
 
-  PID pid;
-  // TODO: Initialize the pid variable.
-  double Kp = 0.01;
-  double Ki = 0.0001;
-  double Kd = 0.1;
-  pid.Init(Kp, Ki, Kd);
+  // TODO: Initialize the lat and long PID controllers.
+  PID pid_lat;
+  PID pid_long;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  pid_lat.Init(0.090967, 0.000159967, 2.1);
+  pid_long.Init(0.1, 0.00001, .1);
+
+  //  Enable or Disable Twiddle
+  bool so_you_want_to_twiddle = false;
+
+  if (so_you_want_to_twiddle) {
+    pid_lat.twiddle_state = 1;  //  active
+    pid_long.twiddle_state = 0; //  off
+  }
+  else {
+    pid_lat.twiddle_state = 0;  //  off
+    pid_long.twiddle_state = 0; //  off
+  }
+
+
+  h.onMessage([&pid_lat, &pid_long](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -54,33 +67,77 @@ int main()
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          /*
-          * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-          pid.UpdateError(cte);
-          double steer_value = -(pid.Kp * pid.p_error + pid.Ki * pid.i_error + pid.Kd * pid.d_error);
 
-          //  RESULTS
-          //  - Plodding and winding but gets around the track, some hits on corners
+          // This allows the PID controllers to execute the reset command to the simulator, not needed unles performing twiddle
+          //pid_lat.ws = ws;
+          //pid_long.ws = ws;
 
-          //  NEXT STEPS
-          //  - Add a throttle controller
-          //  - Use Twiddle to tune parameter
+          //  Grab the last iteration value
+          int lat_iteration_old = pid_lat.twiddle_iteration;
+          int long_iteration_old = pid_long.twiddle_iteration;
 
+          pid_lat.UpdateError(cte);         //  Error of steering input is dependent on steering angle sign
+          pid_long.UpdateError(fabs(cte));  //  Error of throttle input is independent of steering angle sign
 
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+                                            // Debug Messages for Twiddle
+          if (pid_lat.cycle % 100 == 1) {
+            std::cout << "STEERING Kp: " << pid_lat.Kp << " Ki: " << pid_lat.Ki << " Kd: " << pid_lat.Kd << std::endl;
+            std::cout << "STEERING Iteration: " << pid_lat.twiddle_iteration << " Active Gain: " << pid_lat.current_gain << " Gain State: " << pid_lat.gain_state[pid_lat.current_gain] << std::endl;
+            std::cout << "STEERING cycle: " << pid_lat.cycle << " Current Error: " << pid_lat.current_err << std::endl;
+          }
+          else if (pid_long.cycle % 100 == 1) {
+            std::cout << "THROTTLE Kp: " << pid_long.Kp << " Ki: " << pid_long.Ki << " Kd: " << pid_long.Kd << std::endl;
+            std::cout << "THROTTLE Iteration: " << pid_long.twiddle_iteration << " Active Gain: " << pid_long.current_gain << " Gain State: " << pid_long.gain_state[pid_long.current_gain] << std::endl;
+            std::cout << "THROTTLE cycle: " << pid_long.cycle << " Current Error: " << pid_long.current_err << std::endl;
+          }
+
+          // if the twiddling has move on to the next iteration, clear the error
+          if ((pid_lat.twiddle_iteration > lat_iteration_old) || (pid_long.twiddle_iteration > long_iteration_old)) {
+            pid_lat.ClearError();
+            pid_long.ClearError();
+          }
+
+          // Switch the actively twiddling controller
+          if (pid_lat.twiddle_standby_flag) {
+            pid_lat.twiddle_standby_flag = false;
+            if (pid_long.twiddle_state == 2) { pid_long.twiddle_state = 1; }
+            else if (pid_lat.twiddle_state == 2) { pid_lat.twiddle_state = 1; }
+          }
+          if (pid_long.twiddle_standby_flag) {
+            pid_long.twiddle_standby_flag = false;
+            if (pid_lat.twiddle_state == 2) { pid_lat.twiddle_state = 1; }
+            else if (pid_long.twiddle_state == 2) { pid_long.twiddle_state = 1; }
+          }
+
+          // PID Setpoints and Saturation Values
+          double steer_target = 0.0;
+          double throttle_target = 0.6;
+          double steer_max = 20;  // degrees
+          double steer_scale = 0.04;  // convert degrees to sim scaling [-1, 1] -> [-25, 25]
+
+                                      // Lateral PID
+          double steer_value = steer_target - (pid_lat.Kp * pid_lat.p_error + pid_lat.Ki * pid_lat.i_error + pid_lat.Kd * pid_lat.d_error);
+
+          // Lateral PID Saturation
+          if (steer_value > steer_max * steer_scale) {
+            steer_value = steer_max * steer_scale;
+          }
+          else if (steer_value < -steer_max * steer_scale) {
+            steer_value = -steer_max * steer_scale;
+          }
+
+          // Longitudinal PID
+          double throttle_value = throttle_target - (pid_long.Kp * pid_long.p_error + pid_long.Ki * pid_long.i_error + pid_long.Kd * pid_long.d_error);
+
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
+          msgJson["throttle"] = throttle_value;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //          std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
-      } else {
+      }
+      else {
         // Manual driving
         std::string msg = "42[\"manual\",{}]";
         ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
